@@ -35,45 +35,10 @@ const rouletteResults = Array(10)
   .flat();
 
 function App() {
-  // =========================
-  // AUTH
-  // =========================
-
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-useEffect(() => {
-  fetch("/api/auth/me", {
-    credentials: "include",
-  })
-    .then(async (res) => {
-      const data = await res.json();
-
-      console.log("AUTH RESPONSE:", data);
-
-      return data;
-    })
-    .then((data) => {
-      if (data.loggedIn) {
-        setUser(data.user);
-      } else {
-        setUser(null);
-      }
-    })
-    .catch((error) => {
-      console.error("AUTH ERROR:", error);
-    })
-    .finally(() => {
-      setAuthLoading(false);
-    });
-}, []);
-
-  // =========================
-  // GAME
-  // =========================
-
-  const [balance, setBalance] =
-    useState(1000);
+  const [balance, setBalance] = useState(1000);
 
   const [selectedItem, setSelectedItem] =
     useState(items[3]);
@@ -81,17 +46,53 @@ useEffect(() => {
   const [targetItem, setTargetItem] =
     useState(items[5]);
 
-  const [result, setResult] =
-    useState(null);
+  const [result, setResult] = useState(null);
+  const [spinning, setSpinning] = useState(false);
 
-  const [spinning, setSpinning] =
-    useState(false);
+  const rouletteRef = useRef(null);
+  const trackRef = useRef(null);
 
-  const rouletteRef =
-    useRef(null);
+  // =========================
+  // AUTH
+  // =========================
 
-  const trackRef =
-    useRef(null);
+  useEffect(() => {
+    fetch("/api/auth/me", {
+      credentials: "include",
+    })
+      .then(async (res) => {
+        const data = await res.json();
+
+        console.log(
+          "AUTH RESPONSE:",
+          data
+        );
+
+        if (data.loggedIn) {
+          setUser(data.user);
+
+          // Берём баланс из базы
+          setBalance(
+            Number(data.user.balance)
+          );
+        } else {
+          setUser(null);
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "AUTH ERROR:",
+          error
+        );
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
+  }, []);
+
+  // =========================
+  // CHANCE
+  // =========================
 
   const chance = Math.min(
     100,
@@ -121,7 +122,6 @@ useEffect(() => {
     setResult(null);
     setSpinning(true);
 
-    // Определяем результат
     const win =
       Math.random() * 100 <
       chance;
@@ -137,7 +137,6 @@ useEffect(() => {
         selectedItem.price
     );
 
-    // Ищем подходящие позиции
     const possibleIndexes = [];
 
     rouletteResults.forEach(
@@ -153,7 +152,6 @@ useEffect(() => {
       }
     );
 
-    // Выбираем позицию
     const targetIndex =
       possibleIndexes[
         Math.floor(
@@ -171,14 +169,12 @@ useEffect(() => {
       rouletteRef.current
         ?.offsetWidth || 1000;
 
-    // Центр карточки
-    // под центр окна
     const targetPosition =
       targetIndex * step +
       itemWidth / 2 -
       containerWidth / 2;
 
-    // Сбрасываем позицию
+    // Начальная позиция
     if (trackRef.current) {
       trackRef.current.style.transition =
         "none";
@@ -187,7 +183,6 @@ useEffect(() => {
         "translate3d(0, 0, 0)";
     }
 
-    // Запускаем вращение
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (
@@ -226,78 +221,84 @@ useEffect(() => {
   // HEADER
   // =========================
 
-  const renderHeader =
-    () => {
-      if (authLoading) {
-        return (
-          <div className="header-right">
-            <span className="auth-loading">
-              LOADING...
-            </span>
-          </div>
-        );
-      }
-
-      if (!user) {
-        return (
-          <div className="header-right">
-            <a
-              className="steam-login"
-              href="/api/auth/steam"
-            >
-              🎮 ВОЙТИ ЧЕРЕЗ STEAM
-            </a>
-          </div>
-        );
-      }
-
+  const renderHeader = () => {
+    if (authLoading) {
       return (
         <div className="header-right">
-<div className="steam-user">
-
-  {user.avatar ? (
-    <img
-      src={user.avatar}
-      alt="Steam avatar"
-      className="steam-avatar"
-    />
-  ) : (
-    <div className="steam-avatar-placeholder">
-      👤
-    </div>
-  )}
-
-  <div className="steam-user-info">
-    <strong>
-      {user.steam_name}
-    </strong>
-
-    <span>
-      💰 $
-      {Number(user.balance).toLocaleString()}
-    </span>
-  </div>
-
-</div>
-
-          {user.is_admin && (
-            <button
-              className="admin-button"
-              onClick={() => {
-                window.location.href =
-                  "/admin";
-              }}
-            >
-              ⚙ ADMIN
-            </button>
-          )}
-
+          <span className="auth-loading">
+            LOADING...
+          </span>
         </div>
       );
-    };
+    }
+
+    // Не авторизован
+    if (!user) {
+      return (
+        <div className="header-right">
+          <a
+            className="steam-login"
+            href="/api/auth/steam"
+          >
+            🎮 ВОЙТИ ЧЕРЕЗ STEAM
+          </a>
+        </div>
+      );
+    }
+
+    // Авторизован
+    return (
+      <div className="header-right">
+
+        <div className="steam-user">
+
+          {user.avatar ? (
+            <img
+              src={user.avatar}
+              alt="Steam avatar"
+              className="steam-avatar"
+            />
+          ) : (
+            <div className="steam-avatar-placeholder">
+              👤
+            </div>
+          )}
+
+          <div className="steam-user-info">
+
+            <strong>
+              {user.steam_name}
+            </strong>
+
+            <span>
+              💰 $
+              {Number(
+                balance
+              ).toLocaleString()}
+            </span>
+
+          </div>
+
+        </div>
+
+        {user.is_admin && (
+          <button
+            className="admin-button"
+            onClick={() => {
+              window.location.href =
+                "/admin";
+            }}
+          >
+            ⚙ ADMIN
+          </button>
+        )}
+
+      </div>
+    );
+  };
 
   // =========================
-  // PAGE
+  // MAIN PAGE
   // =========================
 
   return (
@@ -317,8 +318,6 @@ useEffect(() => {
 
       <main>
 
-        {/* TITLE */}
-
         <div className="title">
 
           <h1>
@@ -332,7 +331,9 @@ useEffect(() => {
 
         </div>
 
-        {/* ROULETTE */}
+        {/* =========================
+            ROULETTE
+        ========================== */}
 
         <section
           className="roulette"
@@ -375,11 +376,11 @@ useEffect(() => {
 
         </section>
 
-        {/* ITEMS */}
+        {/* =========================
+            ITEMS
+        ========================== */}
 
         <section className="upgrade-panel">
-
-          {/* YOUR ITEM */}
 
           <div className="item-section">
 
@@ -447,13 +448,9 @@ useEffect(() => {
 
           </div>
 
-          {/* ARROW */}
-
           <div className="arrow">
             →
           </div>
-
-          {/* TARGET */}
 
           <div className="item-section">
 
@@ -523,7 +520,9 @@ useEffect(() => {
 
         </section>
 
-        {/* STATS */}
+        {/* =========================
+            STATS
+        ========================== */}
 
         <section className="chance-panel">
 
@@ -534,8 +533,7 @@ useEffect(() => {
             </span>
 
             <strong>
-              {chance.toFixed(1)}
-              %
+              {chance.toFixed(1)}%
             </strong>
 
           </div>
@@ -555,7 +553,9 @@ useEffect(() => {
 
         </section>
 
-        {/* RESULT */}
+        {/* =========================
+            RESULT
+        ========================== */}
 
         {result && (
           <div
@@ -578,7 +578,9 @@ useEffect(() => {
           </div>
         )}
 
-        {/* BUTTON */}
+        {/* =========================
+            BUTTON
+        ========================== */}
 
         <button
           className="upgrade-button"
