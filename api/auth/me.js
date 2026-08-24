@@ -35,16 +35,15 @@ export default async function handler(req, res) {
       });
     }
 
-    const user = users[0];
-
-    res.status(200).json({
+    return res.status(200).json({
       loggedIn: true,
-      user,
+      user: users[0],
     });
+
   } catch (error) {
     console.error(error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Server error",
     });
   }
