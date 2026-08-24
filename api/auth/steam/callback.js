@@ -1,11 +1,8 @@
 import sql from "../../db.js";
-import crypto from "crypto";
 
 export default async function handler(req, res) {
   try {
-    const params = req.query;
-
-    const claimedId = params["openid.claimed_id"];
+    const claimedId = req.query["openid.claimed_id"];
 
     if (!claimedId) {
       return res.status(400).send("Steam ID not found");
@@ -17,24 +14,21 @@ export default async function handler(req, res) {
       return res.status(400).send("Invalid Steam ID");
     }
 
-    // Проверяем OpenID через Steam
-    const verificationParams = new URLSearchParams();
+    // Проверяем авторизацию через Steam
+    const params = new URLSearchParams();
 
-    for (const [key, value] of Object.entries(params)) {
+    for (const [key, value] of Object.entries(req.query)) {
       if (key.startsWith("openid.")) {
-        verificationParams.append(
+        params.append(
           key,
           Array.isArray(value) ? value[0] : value
         );
       }
     }
 
-    verificationParams.set(
-      "openid.mode",
-      "check_authentication"
-    );
+    params.set("openid.mode", "check_authentication");
 
-    const verificationResponse = await fetch(
+    const response = await fetch(
       "https://steamcommunity.com/openid/login",
       {
         method: "POST",
@@ -42,24 +36,19 @@ export default async function handler(req, res) {
           "Content-Type":
             "application/x-www-form-urlencoded",
         },
-        body: verificationParams.toString(),
+        body: params.toString(),
       }
     );
 
-    const verificationText =
-      await verificationResponse.text();
+    const verification = await response.text();
 
-    if (
-      !verificationText.includes(
-        "is_valid:true"
-      )
-    ) {
+    if (!verification.includes("is_valid:true")) {
       return res
         .status(401)
         .send("Steam authentication failed");
     }
 
-    // Ищем пользователя
+    // Ищем пользователя в базе
     const users = await sql`
       SELECT *
       FROM users
@@ -79,8 +68,8 @@ export default async function handler(req, res) {
         )
         VALUES (
           ${steamId},
-          ${"Steam User"},
-          ${1000},
+          'Steam User',
+          1000,
           ${
             steamId ===
             process.env.ADMIN_STEAM_ID
@@ -94,28 +83,15 @@ export default async function handler(req, res) {
       user = users[0];
     }
 
-    // Создаём случайный session ID
-    const sessionId =
-      crypto.randomBytes(32).toString("hex");
-
-    // Пока храним session ID в cookie.
-    // Позже вынесем сессии в отдельную таблицу.
+    // Сохраняем SteamID в cookie
     res.setHeader(
       "Set-Cookie",
-      `minegrade_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
+      `minegrade_steam=${steamId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
     );
 
-    // Для первой версии запоминаем SteamID
-    // в отдельной cookie.
-    res.setHeader(
-      "Set-Cookie",
-      [
-        `minegrade_session=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`,
-        `minegrade_steam=${steamId}; Path=/; Secure; SameSite=Lax; Max-Age=604800`,
-      ]
-    );
-
+    // Возвращаем пользователя на сайт
     res.redirect(302, "/");
+
   } catch (error) {
     console.error(error);
 
@@ -123,23 +99,4 @@ export default async function handler(req, res) {
       .status(500)
       .send("Authentication server error");
   }
-}export default async function handler(req, res) {
-  const steamId =
-    req.query["openid.claimed_id"]?.split("/").pop();
-
-  if (!steamId) {
-    return res.status(400).send("Steam ID not found");
-  }
-
-  const adminSteamId = process.env.ADMIN_STEAM_ID;
-
-  const isAdmin = steamId === adminSteamId;
-
-  res.status(200).json({
-    steamId,
-    isAdmin,
-    message: isAdmin
-      ? "Admin authorization successful"
-      : "User authorization successful",
-  });
 }
