@@ -21,7 +21,6 @@ export default async function handler(req, res) {
       ok: true,
       database: result,
     });
-
   } catch (error) {
     console.error("NEON ERROR:", error);
 
@@ -31,9 +30,4 @@ export default async function handler(req, res) {
       name: error?.name || "UnknownError",
     });
   }
-}export default function handler(req, res) {
-  res.status(200).json({
-    hello: "MineGrade",
-    time: new Date().toISOString()
-  });
 }
