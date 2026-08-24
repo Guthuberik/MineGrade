@@ -42,24 +42,31 @@ function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.loggedIn) {
-          setUser(data.user);
-        }
-      })
-      .catch((error) => {
-        console.error(
-          "Auth error:",
-          error
-        );
-      })
-      .finally(() => {
-        setAuthLoading(false);
-      });
-  }, []);
+useEffect(() => {
+  fetch("/api/auth/me", {
+    credentials: "include",
+  })
+    .then(async (res) => {
+      const data = await res.json();
+
+      console.log("AUTH RESPONSE:", data);
+
+      return data;
+    })
+    .then((data) => {
+      if (data.loggedIn) {
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
+    })
+    .catch((error) => {
+      console.error("AUTH ERROR:", error);
+    })
+    .finally(() => {
+      setAuthLoading(false);
+    });
+}, []);
 
   // =========================
   // GAME
