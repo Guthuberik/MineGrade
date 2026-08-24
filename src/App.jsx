@@ -253,30 +253,32 @@ useEffect(() => {
 
       return (
         <div className="header-right">
+<div className="steam-user">
 
-          <div className="steam-user">
+  {user.avatar ? (
+    <img
+      src={user.avatar}
+      alt="Steam avatar"
+      className="steam-avatar"
+    />
+  ) : (
+    <div className="steam-avatar-placeholder">
+      👤
+    </div>
+  )}
 
-            {user.avatar && (
-              <img
-                src={user.avatar}
-                alt=""
-              />
-            )}
+  <div className="steam-user-info">
+    <strong>
+      {user.steam_name}
+    </strong>
 
-            <div>
-              <strong>
-                {user.steam_name}
-              </strong>
+    <span>
+      💰 $
+      {Number(user.balance).toLocaleString()}
+    </span>
+  </div>
 
-              <span>
-                💰 $
-                {Number(
-                  user.balance
-                ).toLocaleString()}
-              </span>
-            </div>
-
-          </div>
+</div>
 
           {user.is_admin && (
             <button
