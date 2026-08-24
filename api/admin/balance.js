@@ -1,101 +1,120 @@
 import sql from "../../db.js";
 
-function getCookie(req, name) {
-  const cookieHeader =
-    req.headers.cookie || "";
-
-  const cookies = {};
-
-  cookieHeader
-    .split(";")
-    .forEach((cookie) => {
-      const [key, ...valueParts] =
-        cookie.trim().split("=");
-
-      if (key) {
-        cookies[key] =
-          valueParts.join("=");
-      }
-    });
-
-  return cookies[name];
-}
-
-export default async function handler(
-  req,
-  res
-) {
+export default async function handler(req, res) {
   try {
+    // Только POST
     if (req.method !== "POST") {
       return res.status(405).json({
         error: "Method not allowed",
       });
     }
 
-    // Кто сейчас авторизован
-    const steamId =
-      getCookie(
-        req,
-        "minegrade_steam"
-      );
+    // =========================
+    // Читаем cookie
+    // =========================
 
-    if (!steamId) {
+    const cookieHeader = req.headers.cookie || "";
+
+    const cookies = {};
+
+    cookieHeader.split(";").forEach((cookie) => {
+      const [key, ...valueParts] =
+        cookie.trim().split("=");
+
+      if (key) {
+        cookies[key] = valueParts.join("=");
+      }
+    });
+
+    const adminSteamId =
+      cookies.minegrade_steam;
+
+    // =========================
+    // Проверяем авторизацию
+    // =========================
+
+    if (!adminSteamId) {
       return res.status(401).json({
-        error:
-          "You are not authenticated",
+        error: "Не авторизован",
       });
     }
 
-    // Проверяем, что это админ
+    // =========================
+    // Проверяем админа через БД
+    // =========================
+
     const admins = await sql`
-      SELECT id, steam_id, steam_name, is_admin
+      SELECT
+        id,
+        steam_id,
+        steam_name,
+        is_admin
       FROM users
-      WHERE steam_id = ${steamId}
+      WHERE steam_id = ${adminSteamId}
       LIMIT 1
     `;
 
-    if (
-      admins.length === 0 ||
-      !admins[0].is_admin
-    ) {
+    if (admins.length === 0) {
       return res.status(403).json({
-        error: "Access denied",
+        error: "Пользователь не найден",
       });
     }
+
+    const admin = admins[0];
+
+    if (!admin.is_admin) {
+      return res.status(403).json({
+        error: "Нет доступа",
+      });
+    }
+
+    // =========================
+    // Получаем данные запроса
+    // =========================
 
     const {
       targetSteamId,
       amount,
     } = req.body || {};
 
-    if (
-      !targetSteamId ||
-      !/^\d{17}$/.test(
-        String(targetSteamId)
-      )
-    ) {
+    if (!targetSteamId) {
       return res.status(400).json({
-        error: "Invalid Steam ID",
+        error: "Не указан Steam ID",
       });
     }
 
-    const numericAmount =
-      Number(amount);
-
-    if (
-      !Number.isFinite(
-        numericAmount
-      ) ||
-      numericAmount <= 0
-    ) {
+    if (!/^\d{17}$/.test(String(targetSteamId))) {
       return res.status(400).json({
-        error: "Invalid amount",
+        error: "Некорректный Steam ID",
       });
     }
 
-    // Ищем игрока
+    const money = Number(amount);
+
+    if (!Number.isFinite(money)) {
+      return res.status(400).json({
+        error: "Некорректная сумма",
+      });
+    }
+
+    if (money <= 0) {
+      return res.status(400).json({
+        error: "Сумма должна быть больше 0",
+      });
+    }
+
+    // =========================
+    // Ищем пользователя
+    // =========================
+
     const users = await sql`
-      SELECT *
+      SELECT
+        id,
+        steam_id,
+        steam_name,
+        avatar,
+        balance,
+        is_admin
       FROM users
       WHERE steam_id = ${targetSteamId}
       LIMIT 1
@@ -103,18 +122,18 @@ export default async function handler(
 
     if (users.length === 0) {
       return res.status(404).json({
-        error:
-          "User not found",
+        error: "Пользователь не найден",
       });
     }
 
-    // Начисляем баланс
+    // =========================
+    // Выдаём баланс
+    // =========================
+
     const updated = await sql`
       UPDATE users
-      SET balance =
-        balance + ${numericAmount}
-      WHERE steam_id =
-        ${targetSteamId}
+      SET balance = balance + ${money}
+      WHERE steam_id = ${targetSteamId}
       RETURNING
         id,
         steam_id,
@@ -124,8 +143,18 @@ export default async function handler(
         is_admin
     `;
 
+    if (updated.length === 0) {
+      return res.status(500).json({
+        error: "Не удалось обновить баланс",
+      });
+    }
+
+    // =========================
+    // Ответ
+    // =========================
+
     return res.status(200).json({
-      ok: true,
+      success: true,
       user: updated[0],
     });
 
@@ -136,8 +165,8 @@ export default async function handler(
     );
 
     return res.status(500).json({
-      error:
-        "Internal server error",
+      error: "Ошибка сервера",
+      details: error.message,
     });
   }
 }
