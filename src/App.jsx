@@ -5,6 +5,7 @@ import {
 } from "react";
 
 import "./App.css";
+import Admin from "./Admin";
 
 const items = [
   { name: "Oak Log", icon: "🪵", price: 10 },
@@ -34,7 +35,7 @@ const rouletteResults = Array(10)
   .fill(baseRoulette)
   .flat();
 
-function App() {
+function Home() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -71,7 +72,6 @@ function App() {
         if (data.loggedIn) {
           setUser(data.user);
 
-          // Берём баланс из базы
           setBalance(
             Number(data.user.balance)
           );
@@ -130,7 +130,6 @@ function App() {
       ? "YES"
       : "NO";
 
-    // Списываем ставку
     setBalance(
       (prev) =>
         prev -
@@ -174,7 +173,6 @@ function App() {
       itemWidth / 2 -
       containerWidth / 2;
 
-    // Начальная позиция
     if (trackRef.current) {
       trackRef.current.style.transition =
         "none";
@@ -199,7 +197,6 @@ function App() {
       });
     });
 
-    // Конец вращения
     setTimeout(() => {
       if (win) {
         setBalance(
@@ -232,7 +229,7 @@ function App() {
       );
     }
 
-    // Не авторизован
+    // НЕ АВТОРИЗОВАН
     if (!user) {
       return (
         <div className="header-right">
@@ -246,7 +243,7 @@ function App() {
       );
     }
 
-    // Авторизован
+    // АВТОРИЗОВАН
     return (
       <div className="header-right">
 
@@ -602,6 +599,21 @@ function App() {
 
     </div>
   );
+}
+
+// =========================
+// ROUTING
+// =========================
+
+function App() {
+  if (
+    window.location.pathname ===
+    "/admin"
+  ) {
+    return <Admin />;
+  }
+
+  return <Home />;
 }
 
 export default App;
