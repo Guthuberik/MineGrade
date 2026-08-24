@@ -85,9 +85,11 @@ export default async function handler(req, res) {
 
     // Сохраняем SteamID в cookie
     res.setHeader(
-      "Set-Cookie",
-      `minegrade_steam=${steamId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
-    );
+  "Set-Cookie",
+  `minegrade_steam=${encodeURIComponent(
+    steamId
+  )}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
+);
 
     // Возвращаем пользователя на сайт
     res.redirect(302, "/");
