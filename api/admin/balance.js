@@ -3,112 +3,87 @@ import sql from "../../db.js";
 export default async function handler(req, res) {
   try {
     if (req.method !== "POST") {
-      return res
-        .status(405)
-        .json({
-          error: "Method not allowed",
-        });
+      return res.status(405).json({
+        error: "Method not allowed",
+      });
     }
 
-    const cookieHeader =
-      req.headers.cookie || "";
+    // Получаем Steam ID из cookie
+    const cookieHeader = req.headers.cookie || "";
 
     const cookies = {};
 
-    cookieHeader
-      .split(";")
-      .forEach((cookie) => {
-        const [
-          key,
-          ...valueParts
-        ] = cookie
-          .trim()
-          .split("=");
+    cookieHeader.split(";").forEach((cookie) => {
+      const [key, ...valueParts] =
+        cookie.trim().split("=");
 
-        if (key) {
-          cookies[key] =
-            valueParts.join("=");
-        }
+      if (key) {
+        cookies[key] = valueParts.join("=");
+      }
+    });
+
+    const steamId = cookies.minegrade_steam;
+
+    if (!steamId) {
+      return res.status(401).json({
+        error: "Not authenticated",
       });
-
-    const adminSteamId =
-      cookies.minegrade_steam;
-
-    if (!adminSteamId) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Not logged in",
-        });
     }
 
-    // Проверяем админа
+    // Проверяем, что пользователь реально админ
     const admins = await sql`
       SELECT is_admin
       FROM users
-      WHERE steam_id = ${adminSteamId}
+      WHERE steam_id = ${steamId}
       LIMIT 1
     `;
 
     if (
       admins.length === 0 ||
-      !admins[0].is_admin
+      admins[0].is_admin !== true
     ) {
-      return res
-        .status(403)
-        .json({
-          error:
-            "Access denied",
-        });
+      return res.status(403).json({
+        error: "Access denied",
+      });
     }
 
     const {
-      steamId,
+      targetSteamId,
       amount,
-    } = req.body || {};
+    } = req.body;
 
-    const value = Number(amount);
+    const numericAmount =
+      Number(amount);
 
     if (
-      !steamId ||
-      !Number.isFinite(value) ||
-      value <= 0
+      !targetSteamId ||
+      !Number.isFinite(numericAmount) ||
+      numericAmount <= 0
     ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Invalid data",
-        });
+      return res.status(400).json({
+        error: "Invalid data",
+      });
     }
 
+    // Выдаём баланс
     const updated = await sql`
       UPDATE users
-      SET balance =
-        balance + ${value}
-      WHERE steam_id =
-        ${steamId}
+      SET balance = balance + ${numericAmount}
+      WHERE steam_id = ${targetSteamId}
       RETURNING
-        id,
         steam_id,
         steam_name,
-        avatar,
-        balance,
-        is_admin
+        balance
     `;
 
     if (updated.length === 0) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "User not found",
-        });
+      return res.status(404).json({
+        error: "User not found",
+      });
     }
 
     return res.status(200).json({
-      ok: true,
+      success: true,
       user: updated[0],
     });
 
@@ -118,11 +93,8 @@ export default async function handler(req, res) {
       error
     );
 
-    return res
-      .status(500)
-      .json({
-        error:
-          error.message,
-      });
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 }
