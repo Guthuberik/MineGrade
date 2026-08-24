@@ -101,25 +101,57 @@ function App() {
 
         {/* ROULETTE */}
 
-        <section className={`roulette ${spinning ? "spinning" : ""}`}>
-          <div className="pointer">▼</div>
+<section className={`roulette ${spinning ? "spinning" : ""}`}>
+  <div className="pointer">▼</div>
 
-          <div className="roulette-window">
-            <div className="roulette-track">
-              {rouletteItems.map((item, index) => (
-                <div className="roulette-item" key={index}>
-                  <div className="roulette-icon">
-                    {item.icon}
-                  </div>
+  <div className="roulette-window">
+    <div className="roulette-track">
+      {[
+        "NO",
+        "YES",
+        "NO",
+        "NO",
+        "YES",
+        "NO",
+        "YES",
+        "NO",
+        "NO",
+        "YES",
+        "NO",
+        "YES",
+        "NO",
+        "NO",
+        "YES",
+        "NO",
+        "YES",
+        "NO",
+        "NO",
+        "YES",
+        "NO",
+        "YES",
+        "NO",
+        "NO",
+        "YES",
+        "NO",
+        "YES",
+        "NO",
+        "NO",
+        "YES",
+      ].map((result, index) => (
+        <div
+          className={`roulette-result ${
+            result === "YES" ? "yes" : "no"
+          }`}
+          key={index}
+        >
+          {result}
+        </div>
+      ))}
+    </div>
+  </div>
 
-                  <span>{item.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="roulette-pointer-bottom">▲</div>
-        </section>
+  <div className="roulette-pointer-bottom">▲</div>
+</section>
 
         {/* ITEMS */}
 
