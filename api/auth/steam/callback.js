@@ -26,7 +26,10 @@ export default async function handler(req, res) {
       }
     }
 
-    params.set("openid.mode", "check_authentication");
+    params.set(
+      "openid.mode",
+      "check_authentication"
+    );
 
     const response = await fetch(
       "https://steamcommunity.com/openid/login",
@@ -48,7 +51,44 @@ export default async function handler(req, res) {
         .send("Steam authentication failed");
     }
 
-    // Ищем пользователя в базе
+    // ==========================================
+    // Получаем Steam-профиль
+    // ==========================================
+
+    let steamName = "Steam User";
+    let avatar = null;
+
+    try {
+      const steamResponse = await fetch(
+        `https://steamcommunity.com/profiles/${steamId}?xml=1`
+      );
+
+      const xml = await steamResponse.text();
+
+      const nameMatch =
+        xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/);
+
+      const avatarMatch =
+        xml.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/);
+
+      if (nameMatch) {
+        steamName = nameMatch[1];
+      }
+
+      if (avatarMatch) {
+        avatar = avatarMatch[1];
+      }
+    } catch (profileError) {
+      console.error(
+        "STEAM PROFILE ERROR:",
+        profileError
+      );
+    }
+
+    // ==========================================
+    // Ищем пользователя
+    // ==========================================
+
     const users = await sql`
       SELECT *
       FROM users
@@ -59,16 +99,19 @@ export default async function handler(req, res) {
     let user;
 
     if (users.length === 0) {
+
       const created = await sql`
         INSERT INTO users (
           steam_id,
           steam_name,
+          avatar,
           balance,
           is_admin
         )
         VALUES (
           ${steamId},
-          'Steam User',
+          ${steamName},
+          ${avatar},
           1000,
           ${
             steamId ===
@@ -79,23 +122,41 @@ export default async function handler(req, res) {
       `;
 
       user = created[0];
+
     } else {
-      user = users[0];
+
+      const updated = await sql`
+        UPDATE users
+        SET
+          steam_name = ${steamName},
+          avatar = ${avatar}
+        WHERE steam_id = ${steamId}
+        RETURNING *
+      `;
+
+      user = updated[0];
     }
 
+    // ==========================================
     // Сохраняем SteamID в cookie
+    // ==========================================
+
     res.setHeader(
-  "Set-Cookie",
-  `minegrade_steam=${encodeURIComponent(
-    steamId
-  )}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
-);
+      "Set-Cookie",
+      `minegrade_steam=${encodeURIComponent(
+        steamId
+      )}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800`
+    );
 
     // Возвращаем пользователя на сайт
     res.redirect(302, "/");
 
   } catch (error) {
-    console.error(error);
+
+    console.error(
+      "STEAM CALLBACK ERROR:",
+      error
+    );
 
     return res
       .status(500)
