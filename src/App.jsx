@@ -16,22 +16,58 @@ function App() {
   const [balance, setBalance] = useState(1000);
   const [selectedItem, setSelectedItem] = useState(items[3]);
   const [targetItem, setTargetItem] = useState(items[5]);
+
   const [result, setResult] = useState(null);
+  const [spinning, setSpinning] = useState(false);
 
   const chance = Math.min(
     100,
     (selectedItem.price / targetItem.price) * 100
   );
 
+  const rouletteItems = [
+    items[0],
+    items[2],
+    items[3],
+    items[5],
+    items[1],
+    items[4],
+    items[5],
+    items[2],
+    items[6],
+    items[3],
+    items[5],
+    items[0],
+    items[4],
+    items[5],
+    items[7],
+    items[2],
+    items[5],
+    items[1],
+    items[3],
+    items[6],
+    items[5],
+    items[0],
+    items[4],
+    items[5],
+    items[2],
+    items[7],
+  ];
+
   const upgrade = () => {
+    if (spinning) return;
+
     if (selectedItem.price > balance) {
       setResult("NOT ENOUGH MONEY");
       return;
     }
 
-    setBalance((prev) => prev - selectedItem.price);
+    setResult(null);
+    setSpinning(true);
 
     const win = Math.random() * 100 < chance;
+
+    setBalance((prev) => prev - selectedItem.price);
 
     setTimeout(() => {
       if (win) {
@@ -40,7 +76,9 @@ function App() {
       } else {
         setResult("LOSE");
       }
-    }, 600);
+
+      setSpinning(false);
+    }, 4500);
   };
 
   return (
@@ -61,26 +99,59 @@ function App() {
           <p>Risk it. Upgrade it. Win it.</p>
         </div>
 
+        {/* ROULETTE */}
+
+        <section className={`roulette ${spinning ? "spinning" : ""}`}>
+          <div className="pointer">▼</div>
+
+          <div className="roulette-window">
+            <div className="roulette-track">
+              {rouletteItems.map((item, index) => (
+                <div className="roulette-item" key={index}>
+                  <div className="roulette-icon">
+                    {item.icon}
+                  </div>
+
+                  <span>{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="roulette-pointer-bottom">▲</div>
+        </section>
+
+        {/* ITEMS */}
+
         <section className="upgrade-panel">
           <div className="item-section">
             <span className="label">YOUR ITEM</span>
 
             <div className="item-card">
               <div className="item-icon">{selectedItem.icon}</div>
+
               <h2>{selectedItem.name}</h2>
-              <span>${selectedItem.price.toLocaleString()}</span>
+
+              <span>
+                ${selectedItem.price.toLocaleString()}
+              </span>
             </div>
 
             <select
               value={selectedItem.name}
+              disabled={spinning}
               onChange={(e) =>
                 setSelectedItem(
-                  items.find((item) => item.name === e.target.value)
+                  items.find(
+                    (item) => item.name === e.target.value
+                  )
                 )
               }
             >
               {items.map((item) => (
-                <option key={item.name}>{item.name}</option>
+                <option key={item.name}>
+                  {item.name}
+                </option>
               ))}
             </select>
           </div>
@@ -92,24 +163,35 @@ function App() {
 
             <div className="item-card target">
               <div className="item-icon">{targetItem.icon}</div>
+
               <h2>{targetItem.name}</h2>
-              <span>${targetItem.price.toLocaleString()}</span>
+
+              <span>
+                ${targetItem.price.toLocaleString()}
+              </span>
             </div>
 
             <select
               value={targetItem.name}
+              disabled={spinning}
               onChange={(e) =>
                 setTargetItem(
-                  items.find((item) => item.name === e.target.value)
+                  items.find(
+                    (item) => item.name === e.target.value
+                  )
                 )
               }
             >
               {items.map((item) => (
-                <option key={item.name}>{item.name}</option>
+                <option key={item.name}>
+                  {item.name}
+                </option>
               ))}
             </select>
           </div>
         </section>
+
+        {/* STATS */}
 
         <section className="chance-panel">
           <div>
@@ -119,18 +201,28 @@ function App() {
 
           <div>
             <span>POTENTIAL WIN</span>
-            <strong>${targetItem.price.toLocaleString()}</strong>
+            <strong>
+              ${targetItem.price.toLocaleString()}
+            </strong>
           </div>
         </section>
 
         {result && (
-          <div className={`result ${result === "WIN" ? "win" : "lose"}`}>
-            {result}
+          <div
+            className={`result ${
+              result === "WIN" ? "win" : "lose"
+            }`}
+          >
+            {result === "WIN" ? "🎉 WIN!" : "💀 LOSE"}
           </div>
         )}
 
-        <button className="upgrade-button" onClick={upgrade}>
-          ⚡ UPGRADE
+        <button
+          className="upgrade-button"
+          onClick={upgrade}
+          disabled={spinning}
+        >
+          {spinning ? "⚡ SPINNING..." : "⚡ UPGRADE"}
         </button>
       </main>
 
