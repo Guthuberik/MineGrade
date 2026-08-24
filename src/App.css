@@ -129,42 +129,7 @@
   bottom: -14px;
 }
 
-/* SPIN ANIMATION */
 
-.spinning .roulette-track {
-  animation: rouletteSpin 4.5s cubic-bezier(
-    0.08,
-    0.7,
-    0.15,
-    1
-  );
-}
-
-@keyframes rouletteSpin {
-  0% {
-    transform: translateX(0);
-  }
-
-  15% {
-    transform: translateX(-400px);
-  }
-
-  45% {
-    transform: translateX(-1100px);
-  }
-
-  70% {
-    transform: translateX(-1650px);
-  }
-
-  88% {
-    transform: translateX(-1980px);
-  }
-
-  100% {
-    transform: translateX(-2150px);
-  }
-}
 
 /* DISABLED */
 
