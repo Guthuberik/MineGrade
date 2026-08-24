@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const steamId = match[1];
+    const steamId = decodeURIComponent(match[1]);
 
     const users = await sql`
       SELECT
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       LIMIT 1
     `;
 
-    if (users.length === 0) {
+    if (!users.length) {
       return res.status(200).json({
         loggedIn: false,
       });
@@ -39,11 +39,11 @@ export default async function handler(req, res) {
       loggedIn: true,
       user: users[0],
     });
-
   } catch (error) {
-    console.error(error);
+    console.error("ME ERROR:", error);
 
     return res.status(500).json({
+      loggedIn: false,
       error: "Server error",
     });
   }
