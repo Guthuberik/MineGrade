@@ -2,19 +2,25 @@ import sql from "../../db.js";
 
 export default async function handler(req, res) {
   try {
-    const cookies = req.headers.cookie || "";
+    const cookieHeader = req.headers.cookie || "";
 
-    const match = cookies.match(
-      /(?:^|;\s*)minegrade_steam=([^;]+)/
-    );
+    const cookies = {};
 
-    if (!match) {
+    cookieHeader.split(";").forEach((cookie) => {
+      const [key, ...valueParts] = cookie.trim().split("=");
+
+      if (key) {
+        cookies[key] = valueParts.join("=");
+      }
+    });
+
+    const steamId = cookies.minegrade_steam;
+
+    if (!steamId) {
       return res.status(200).json({
         loggedIn: false,
       });
     }
-
-    const steamId = decodeURIComponent(match[1]);
 
     const users = await sql`
       SELECT
@@ -29,22 +35,25 @@ export default async function handler(req, res) {
       LIMIT 1
     `;
 
-    if (!users.length) {
+    if (users.length === 0) {
       return res.status(200).json({
         loggedIn: false,
       });
     }
 
+    const user = users[0];
+
     return res.status(200).json({
       loggedIn: true,
-      user: users[0],
+      user: user,
     });
+
   } catch (error) {
-    console.error("ME ERROR:", error);
+    console.error("AUTH ME ERROR:", error);
 
     return res.status(500).json({
       loggedIn: false,
-      error: "Server error",
+      error: error.message,
     });
   }
 }
