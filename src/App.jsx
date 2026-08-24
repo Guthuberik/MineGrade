@@ -1,4 +1,9 @@
-import { useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import "./App.css";
 
 const items = [
@@ -30,26 +35,79 @@ const rouletteResults = Array(10)
   .flat();
 
 function App() {
-  const [balance, setBalance] = useState(1000);
-  const [selectedItem, setSelectedItem] = useState(items[3]);
-  const [targetItem, setTargetItem] = useState(items[5]);
+  // =========================
+  // AUTH
+  // =========================
 
-  const [result, setResult] = useState(null);
-  const [spinning, setSpinning] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  const rouletteRef = useRef(null);
-  const trackRef = useRef(null);
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.loggedIn) {
+          setUser(data.user);
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "Auth error:",
+          error
+        );
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
+  }, []);
+
+  // =========================
+  // GAME
+  // =========================
+
+  const [balance, setBalance] =
+    useState(1000);
+
+  const [selectedItem, setSelectedItem] =
+    useState(items[3]);
+
+  const [targetItem, setTargetItem] =
+    useState(items[5]);
+
+  const [result, setResult] =
+    useState(null);
+
+  const [spinning, setSpinning] =
+    useState(false);
+
+  const rouletteRef =
+    useRef(null);
+
+  const trackRef =
+    useRef(null);
 
   const chance = Math.min(
     100,
-    (selectedItem.price / targetItem.price) * 100
+    (selectedItem.price /
+      targetItem.price) *
+      100
   );
+
+  // =========================
+  // UPGRADE
+  // =========================
 
   const upgrade = () => {
     if (spinning) return;
 
-    if (selectedItem.price > balance) {
-      setResult("NOT ENOUGH MONEY");
+    if (
+      selectedItem.price >
+      balance
+    ) {
+      setResult(
+        "NOT ENOUGH MONEY"
+      );
+
       return;
     }
 
@@ -57,31 +115,38 @@ function App() {
     setSpinning(true);
 
     // Определяем результат
-    const win = Math.random() * 100 < chance;
-    const finalResult = win ? "YES" : "NO";
+    const win =
+      Math.random() * 100 <
+      chance;
+
+    const finalResult = win
+      ? "YES"
+      : "NO";
 
     // Списываем ставку
     setBalance(
-      (prev) => prev - selectedItem.price
+      (prev) =>
+        prev -
+        selectedItem.price
     );
 
-    // Берём только индексы нужного результата
+    // Ищем подходящие позиции
     const possibleIndexes = [];
 
     rouletteResults.forEach(
       (value, index) => {
-        if (value === finalResult) {
-          possibleIndexes.push(index);
+        if (
+          value ===
+          finalResult
+        ) {
+          possibleIndexes.push(
+            index
+          );
         }
       }
     );
 
-    /*
-      Берём результат примерно в середине
-      рулетки, чтобы до него было много
-      элементов для нормального вращения.
-    */
-
+    // Выбираем позицию
     const targetIndex =
       possibleIndexes[
         Math.floor(
@@ -92,26 +157,21 @@ function App() {
 
     const itemWidth = 150;
     const gap = 12;
-    const step = itemWidth + gap;
+    const step =
+      itemWidth + gap;
 
     const containerWidth =
-      rouletteRef.current?.offsetWidth ||
-      1000;
+      rouletteRef.current
+        ?.offsetWidth || 1000;
 
-    /*
-      Центр нужной карточки должен совпасть
-      с центром окна.
-    */
-
+    // Центр карточки
+    // под центр окна
     const targetPosition =
       targetIndex * step +
       itemWidth / 2 -
       containerWidth / 2;
 
-    /*
-      Начинаем всегда с нуля.
-    */
-
+    // Сбрасываем позицию
     if (trackRef.current) {
       trackRef.current.style.transition =
         "none";
@@ -120,14 +180,14 @@ function App() {
         "translate3d(0, 0, 0)";
     }
 
-    /*
-      Небольшая задержка нужна браузеру,
-      чтобы он успел применить начальную позицию.
-    */
-
+    // Запускаем вращение
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!trackRef.current) return;
+        if (
+          !trackRef.current
+        ) {
+          return;
+        }
 
         trackRef.current.style.transition =
           "transform 5s cubic-bezier(0.12, 0.7, 0.15, 1)";
@@ -137,12 +197,13 @@ function App() {
       });
     });
 
-    // Завершаем после анимации
+    // Конец вращения
     setTimeout(() => {
       if (win) {
         setBalance(
           (prev) =>
-            prev + targetItem.price
+            prev +
+            targetItem.price
         );
 
         setResult("WIN");
@@ -154,26 +215,112 @@ function App() {
     }, 5100);
   };
 
+  // =========================
+  // HEADER
+  // =========================
+
+  const renderHeader =
+    () => {
+      if (authLoading) {
+        return (
+          <div className="header-right">
+            <span className="auth-loading">
+              LOADING...
+            </span>
+          </div>
+        );
+      }
+
+      if (!user) {
+        return (
+          <div className="header-right">
+            <a
+              className="steam-login"
+              href="/api/auth/steam"
+            >
+              🎮 ВОЙТИ ЧЕРЕЗ STEAM
+            </a>
+          </div>
+        );
+      }
+
+      return (
+        <div className="header-right">
+
+          <div className="steam-user">
+
+            {user.avatar && (
+              <img
+                src={user.avatar}
+                alt=""
+              />
+            )}
+
+            <div>
+              <strong>
+                {user.steam_name}
+              </strong>
+
+              <span>
+                💰 $
+                {Number(
+                  user.balance
+                ).toLocaleString()}
+              </span>
+            </div>
+
+          </div>
+
+          {user.is_admin && (
+            <button
+              className="admin-button"
+              onClick={() => {
+                window.location.href =
+                  "/admin";
+              }}
+            >
+              ⚙ ADMIN
+            </button>
+          )}
+
+        </div>
+      );
+    };
+
+  // =========================
+  // PAGE
+  // =========================
+
   return (
     <div className="app">
 
       <header>
+
         <div className="logo">
-          ⛏ <span>Mine</span>Grade
+          ⛏{" "}
+          <span>Mine</span>
+          Grade
         </div>
 
-        <div className="balance">
-          💰 ${balance.toLocaleString()}
-        </div>
+        {renderHeader()}
+
       </header>
 
       <main>
 
+        {/* TITLE */}
+
         <div className="title">
-          <h1>UPGRADER</h1>
+
+          <h1>
+            UPGRADER
+          </h1>
+
           <p>
-            Risk it. Upgrade it. Win it.
+            Risk it. Upgrade it.
+            Win it.
           </p>
+
         </div>
 
         {/* ROULETTE */}
@@ -193,11 +340,16 @@ function App() {
               className="roulette-track"
               ref={trackRef}
             >
+
               {rouletteResults.map(
-                (value, index) => (
+                (
+                  value,
+                  index
+                ) => (
                   <div
                     className={`roulette-result ${
-                      value === "YES"
+                      value ===
+                      "YES"
                         ? "yes"
                         : "no"
                     }`}
@@ -207,6 +359,7 @@ function App() {
                   </div>
                 )
               )}
+
             </div>
 
           </div>
@@ -217,6 +370,8 @@ function App() {
 
         <section className="upgrade-panel">
 
+          {/* YOUR ITEM */}
+
           <div className="item-section">
 
             <span className="label">
@@ -226,11 +381,15 @@ function App() {
             <div className="item-card">
 
               <div className="item-icon">
-                {selectedItem.icon}
+                {
+                  selectedItem.icon
+                }
               </div>
 
               <h2>
-                {selectedItem.name}
+                {
+                  selectedItem.name
+                }
               </h2>
 
               <span>
@@ -241,32 +400,51 @@ function App() {
             </div>
 
             <select
-              value={selectedItem.name}
-              disabled={spinning}
-              onChange={(e) =>
-                setSelectedItem(
+              value={
+                selectedItem.name
+              }
+              disabled={
+                spinning
+              }
+              onChange={(e) => {
+                const item =
                   items.find(
                     (item) =>
                       item.name ===
                       e.target.value
-                  )
-                )
-              }
+                  );
+
+                setSelectedItem(
+                  item
+                );
+              }}
             >
-              {items.map((item) => (
-                <option
-                  key={item.name}
-                >
-                  {item.name}
-                </option>
-              ))}
+
+              {items.map(
+                (item) => (
+                  <option
+                    key={
+                      item.name
+                    }
+                  >
+                    {
+                      item.name
+                    }
+                  </option>
+                )
+              )}
+
             </select>
 
           </div>
 
+          {/* ARROW */}
+
           <div className="arrow">
             →
           </div>
+
+          {/* TARGET */}
 
           <div className="item-section">
 
@@ -277,11 +455,15 @@ function App() {
             <div className="item-card target">
 
               <div className="item-icon">
-                {targetItem.icon}
+                {
+                  targetItem.icon
+                }
               </div>
 
               <h2>
-                {targetItem.name}
+                {
+                  targetItem.name
+                }
               </h2>
 
               <span>
@@ -292,25 +474,40 @@ function App() {
             </div>
 
             <select
-              value={targetItem.name}
-              disabled={spinning}
-              onChange={(e) =>
-                setTargetItem(
+              value={
+                targetItem.name
+              }
+              disabled={
+                spinning
+              }
+              onChange={(e) => {
+                const item =
                   items.find(
                     (item) =>
                       item.name ===
                       e.target.value
-                  )
-                )
-              }
+                  );
+
+                setTargetItem(
+                  item
+                );
+              }}
             >
-              {items.map((item) => (
-                <option
-                  key={item.name}
-                >
-                  {item.name}
-                </option>
-              ))}
+
+              {items.map(
+                (item) => (
+                  <option
+                    key={
+                      item.name
+                    }
+                  >
+                    {
+                      item.name
+                    }
+                  </option>
+                )
+              )}
+
             </select>
 
           </div>
@@ -322,16 +519,20 @@ function App() {
         <section className="chance-panel">
 
           <div>
+
             <span>
               UPGRADE CHANCE
             </span>
 
             <strong>
-              {chance.toFixed(1)}%
+              {chance.toFixed(1)}
+              %
             </strong>
+
           </div>
 
           <div>
+
             <span>
               POTENTIAL WIN
             </span>
@@ -340,6 +541,7 @@ function App() {
               $
               {targetItem.price.toLocaleString()}
             </strong>
+
           </div>
 
         </section>
@@ -349,16 +551,21 @@ function App() {
         {result && (
           <div
             className={`result ${
-              result === "WIN"
+              result ===
+              "WIN"
                 ? "win"
                 : "lose"
             }`}
           >
-            {result === "WIN"
+
+            {result ===
+            "WIN"
               ? "🎉 WIN!"
-              : result === "LOSE"
+              : result ===
+                "LOSE"
               ? "💀 LOSE"
               : result}
+
           </div>
         )}
 
@@ -367,7 +574,9 @@ function App() {
         <button
           className="upgrade-button"
           onClick={upgrade}
-          disabled={spinning}
+          disabled={
+            spinning
+          }
         >
           {spinning
             ? "⚡ SPINNING..."
