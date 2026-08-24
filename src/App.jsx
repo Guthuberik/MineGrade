@@ -1,11 +1,5 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
-import Admin from "./Admin";
 
 const items = [
   { name: "Oak Log", icon: "🪵", price: 10 },
@@ -35,9 +29,15 @@ const rouletteResults = Array(10)
   .fill(baseRoulette)
   .flat();
 
-function Home() {
+function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  const [page, setPage] = useState(
+    window.location.pathname === "/admin"
+      ? "admin"
+      : "home"
+  );
 
   const [balance, setBalance] = useState(1000);
 
@@ -53,46 +53,219 @@ function Home() {
   const rouletteRef = useRef(null);
   const trackRef = useRef(null);
 
-  // =========================
+  // ==========================================
   // AUTH
-  // =========================
+  // ==========================================
+
+  const loadUser = async () => {
+    try {
+      setAuthLoading(true);
+
+      const response = await fetch(
+        "/api/auth/me",
+        {
+          credentials: "include",
+        }
+      );
+
+      const data = await response.json();
+
+      console.log("AUTH:", data);
+
+      if (data.loggedIn && data.user) {
+        setUser(data.user);
+        setBalance(
+          Number(data.user.balance) || 0
+        );
+      } else {
+        setUser(null);
+        setBalance(0);
+
+        // Если мы на админке, но не авторизованы
+        if (
+          window.location.pathname === "/admin"
+        ) {
+          window.history.replaceState(
+            {},
+            "",
+            "/"
+          );
+
+          setPage("home");
+        }
+      }
+    } catch (error) {
+      console.error(
+        "AUTH ERROR:",
+        error
+      );
+
+      setUser(null);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch("/api/auth/me", {
-      credentials: "include",
-    })
-      .then(async (res) => {
-        const data = await res.json();
-
-        console.log(
-          "AUTH RESPONSE:",
-          data
-        );
-
-        if (data.loggedIn) {
-          setUser(data.user);
-
-          setBalance(
-            Number(data.user.balance)
-          );
-        } else {
-          setUser(null);
-        }
-      })
-      .catch((error) => {
-        console.error(
-          "AUTH ERROR:",
-          error
-        );
-      })
-      .finally(() => {
-        setAuthLoading(false);
-      });
+    loadUser();
   }, []);
 
-  // =========================
-  // CHANCE
-  // =========================
+  // ==========================================
+  // NAVIGATION
+  // ==========================================
+
+  const goHome = () => {
+    window.history.pushState(
+      {},
+      "",
+      "/"
+    );
+
+    setPage("home");
+  };
+
+  const goAdmin = () => {
+    if (!user?.is_admin) {
+      return;
+    }
+
+    window.history.pushState(
+      {},
+      "",
+      "/admin"
+    );
+
+    setPage("admin");
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (
+        window.location.pathname === "/admin"
+      ) {
+        setPage("admin");
+      } else {
+        setPage("home");
+      }
+    };
+
+    window.addEventListener(
+      "popstate",
+      handlePopState
+    );
+
+    return () => {
+      window.removeEventListener(
+        "popstate",
+        handlePopState
+      );
+    };
+  }, []);
+
+  // ==========================================
+  // ADMIN PAGE
+  // ==========================================
+
+  if (
+    !authLoading &&
+    page === "admin"
+  ) {
+    if (!user) {
+      window.history.replaceState(
+        {},
+        "",
+        "/"
+      );
+
+      return (
+        <div className="app">
+          <main>
+            <div className="title">
+              <h1>AUTHORIZATION REQUIRED</h1>
+
+              <p>
+                Please login through Steam.
+              </p>
+
+              <a
+                className="steam-login"
+                href="/api/auth/steam"
+              >
+                🎮 ВОЙТИ ЧЕРЕЗ STEAM
+              </a>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    if (!user.is_admin) {
+      return (
+        <div className="app">
+          <header>
+            <div className="logo">
+              ⛏ <span>Mine</span>Grade
+            </div>
+          </header>
+
+          <main>
+            <div className="title">
+              <h1>ACCESS DENIED</h1>
+
+              <p>
+                У тебя нет доступа к
+                админ-панели.
+              </p>
+
+              <button
+                className="upgrade-button"
+                onClick={goHome}
+              >
+                ← BACK TO MINEGRADE
+              </button>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    return (
+      <AdminPage
+        user={user}
+        goHome={goHome}
+      />
+    );
+  }
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (authLoading) {
+    return (
+      <div className="app">
+        <header>
+          <div className="logo">
+            ⛏ <span>Mine</span>Grade
+          </div>
+        </header>
+
+        <main>
+          <div className="title">
+            <h1>LOADING...</h1>
+            <p>
+              Checking Steam
+              authorization
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // UPGRADE CHANCE
+  // ==========================================
 
   const chance = Math.min(
     100,
@@ -101,12 +274,17 @@ function Home() {
       100
   );
 
-  // =========================
+  // ==========================================
   // UPGRADE
-  // =========================
+  // ==========================================
 
   const upgrade = () => {
-    if (spinning) return;
+    if (
+      spinning ||
+      !user
+    ) {
+      return;
+    }
 
     if (
       selectedItem.price >
@@ -126,9 +304,8 @@ function Home() {
       Math.random() * 100 <
       chance;
 
-    const finalResult = win
-      ? "YES"
-      : "NO";
+    const finalResult =
+      win ? "YES" : "NO";
 
     setBalance(
       (prev) =>
@@ -169,7 +346,8 @@ function Home() {
         ?.offsetWidth || 1000;
 
     const targetPosition =
-      targetIndex * step +
+      targetIndex *
+        step +
       itemWidth / 2 -
       containerWidth / 2;
 
@@ -178,7 +356,7 @@ function Home() {
         "none";
 
       trackRef.current.style.transform =
-        "translate3d(0, 0, 0)";
+        "translate3d(0,0,0)";
     }
 
     requestAnimationFrame(() => {
@@ -193,7 +371,7 @@ function Home() {
           "transform 5s cubic-bezier(0.12, 0.7, 0.15, 1)";
 
         trackRef.current.style.transform =
-          `translate3d(${-targetPosition}px, 0, 0)`;
+          `translate3d(${-targetPosition}px,0,0)`;
       });
     });
 
@@ -214,22 +392,11 @@ function Home() {
     }, 5100);
   };
 
-  // =========================
+  // ==========================================
   // HEADER
-  // =========================
+  // ==========================================
 
   const renderHeader = () => {
-    if (authLoading) {
-      return (
-        <div className="header-right">
-          <span className="auth-loading">
-            LOADING...
-          </span>
-        </div>
-      );
-    }
-
-    // НЕ АВТОРИЗОВАН
     if (!user) {
       return (
         <div className="header-right">
@@ -243,7 +410,6 @@ function Home() {
       );
     }
 
-    // АВТОРИЗОВАН
     return (
       <div className="header-right">
 
@@ -281,10 +447,7 @@ function Home() {
         {user.is_admin && (
           <button
             className="admin-button"
-            onClick={() => {
-              window.location.href =
-                "/admin";
-            }}
+            onClick={goAdmin}
           >
             ⚙ ADMIN
           </button>
@@ -294,9 +457,9 @@ function Home() {
     );
   };
 
-  // =========================
-  // MAIN PAGE
-  // =========================
+  // ==========================================
+  // HOME
+  // ==========================================
 
   return (
     <div className="app">
@@ -328,9 +491,7 @@ function Home() {
 
         </div>
 
-        {/* =========================
-            ROULETTE
-        ========================== */}
+        {/* ROULETTE */}
 
         <section
           className="roulette"
@@ -343,7 +504,6 @@ function Home() {
 
           <div className="roulette-window">
 
-          
             <div
               className="roulette-track"
               ref={trackRef}
@@ -374,9 +534,7 @@ function Home() {
 
         </section>
 
-        {/* =========================
-            ITEMS
-        ========================== */}
+        {/* ITEMS */}
 
         <section className="upgrade-panel">
 
@@ -518,9 +676,7 @@ function Home() {
 
         </section>
 
-        {/* =========================
-            STATS
-        ========================== */}
+        {/* STATS */}
 
         <section className="chance-panel">
 
@@ -551,9 +707,7 @@ function Home() {
 
         </section>
 
-        {/* =========================
-            RESULT
-        ========================== */}
+        {/* RESULT */}
 
         {result && (
           <div
@@ -576,18 +730,19 @@ function Home() {
           </div>
         )}
 
-        {/* =========================
-            BUTTON
-        ========================== */}
+        {/* BUTTON */}
 
         <button
           className="upgrade-button"
           onClick={upgrade}
           disabled={
-            spinning
+            spinning ||
+            !user
           }
         >
-          {spinning
+          {!user
+            ? "🎮 LOGIN TO PLAY"
+            : spinning
             ? "⚡ SPINNING..."
             : "⚡ UPGRADE"}
         </button>
@@ -602,55 +757,139 @@ function Home() {
   );
 }
 
-// =========================
-// ROUTING
-// =========================
-function AdminPanel({ user }) {
-  const [steamId, setSteamId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+// ==========================================
+// ADMIN PAGE
+// ==========================================
+
+function AdminPage({
+  user,
+  goHome,
+}) {
+  const [steamId, setSteamId] =
+    useState("");
+
+  const [amount, setAmount] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(false);
 
   const giveBalance = async () => {
-    if (!steamId || !amount) {
-      setMessage("❌ Заполни все поля");
+    setMessage("");
+
+    if (!steamId.trim()) {
+      setMessage(
+        "❌ Введи Steam ID"
+      );
+
+      return;
+    }
+
+    const numericAmount =
+      Number(amount);
+
+    if (
+      !Number.isFinite(
+        numericAmount
+      ) ||
+      numericAmount <= 0
+    ) {
+      setMessage(
+        "❌ Введи корректную сумму"
+      );
+
+      return;
+    }
+
+    if (
+      !/^\d{17}$/.test(
+        steamId.trim()
+      )
+    ) {
+      setMessage(
+        "❌ Steam ID должен состоять из 17 цифр"
+      );
+
       return;
     }
 
     setLoading(true);
-    setMessage("");
 
     try {
-      const response = await fetch("/api/admin/balance", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          targetSteamId: steamId,
-          amount: Number(amount),
-        }),
-      });
+      const response =
+        await fetch(
+          "/api/admin/balance",
+          {
+            method: "POST",
 
-      const data = await response.json();
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              targetSteamId:
+                steamId.trim(),
+
+              amount:
+                numericAmount,
+            }),
+          }
+        );
+
+      const text =
+        await response.text();
+
+      let data;
+
+      try {
+        data =
+          JSON.parse(text);
+      } catch {
+        console.error(
+          "SERVER RESPONSE:",
+          text
+        );
+
+        setMessage(
+          `❌ Сервер вернул ошибку ${response.status}`
+        );
+
+        return;
+      }
 
       if (!response.ok) {
         setMessage(
-          `❌ ${data.error || "Ошибка"}`
+          `❌ ${
+            data.error ||
+            "Ошибка сервера"
+          }`
         );
+
         return;
       }
 
       setMessage(
-        `✅ ${data.user.steam_name}: баланс теперь $${Number(
+        `✅ Баланс ${
+          data.user.steam_name
+        } изменён. Новый баланс: $${Number(
           data.user.balance
         ).toLocaleString()}`
       );
 
       setAmount("");
+
     } catch (error) {
-      console.error(error);
+      console.error(
+        "ADMIN ERROR:",
+        error
+      );
 
       setMessage(
         "❌ Не удалось связаться с сервером"
@@ -662,13 +901,19 @@ function AdminPanel({ user }) {
 
   return (
     <div className="app">
+
       <header>
+
         <div className="logo">
-          ⛏ <span>Mine</span>Grade
+          ⛏{" "}
+          <span>Mine</span>
+          Grade
         </div>
 
         <div className="header-right">
+
           <div className="steam-user">
+
             {user.avatar ? (
               <img
                 src={user.avatar}
@@ -682,33 +927,48 @@ function AdminPanel({ user }) {
             )}
 
             <div className="steam-user-info">
-              <strong>{user.steam_name}</strong>
+
+              <strong>
+                {user.steam_name}
+              </strong>
 
               <span>
                 🛡 ADMIN
               </span>
+
             </div>
+
           </div>
 
           <button
             className="admin-button"
-            onClick={() => {
-              window.location.href = "/";
-            }}
+            onClick={goHome}
           >
             ← BACK
           </button>
+
         </div>
+
       </header>
 
       <main>
+
         <div className="title">
-          <h1>ADMIN PANEL</h1>
-          <p>MineGrade administration</p>
+
+          <h1>
+            ADMIN PANEL
+          </h1>
+
+          <p>
+            MineGrade administration
+          </p>
+
         </div>
 
         <section className="admin-panel">
+
           <div className="admin-card">
+
             <span className="label">
               TARGET STEAM ID
             </span>
@@ -716,15 +976,23 @@ function AdminPanel({ user }) {
             <input
               className="admin-input"
               type="text"
+              inputMode="numeric"
               placeholder="7656119XXXXXXXXXX"
               value={steamId}
               onChange={(e) =>
-                setSteamId(e.target.value)
+                setSteamId(
+                  e.target.value.replace(
+                    /\D/g,
+                    ""
+                  )
+                )
               }
             />
+
           </div>
 
           <div className="admin-card">
+
             <span className="label">
               BALANCE TO GIVE
             </span>
@@ -732,19 +1000,27 @@ function AdminPanel({ user }) {
             <input
               className="admin-input"
               type="number"
-              placeholder="1000"
               min="1"
+              step="1"
+              placeholder="1000"
               value={amount}
               onChange={(e) =>
-                setAmount(e.target.value)
+                setAmount(
+                  e.target.value
+                )
               }
             />
+
           </div>
 
           <button
             className="upgrade-button"
-            onClick={giveBalance}
-            disabled={loading}
+            onClick={
+              giveBalance
+            }
+            disabled={
+              loading
+            }
           >
             {loading
               ? "⚡ PROCESSING..."
@@ -756,24 +1032,17 @@ function AdminPanel({ user }) {
               {message}
             </div>
           )}
+
         </section>
+
       </main>
 
       <footer>
         MineGrade © 2026 · Administration
       </footer>
+
     </div>
   );
-}
-function App() {
-  if (
-    window.location.pathname ===
-    "/admin"
-  ) {
-    return <Admin />;
-  }
-
-  return <Home />;
 }
 
 export default App;
