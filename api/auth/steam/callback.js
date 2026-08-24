@@ -54,36 +54,32 @@ export default async function handler(req, res) {
     // ==========================================
     // Получаем Steam-профиль
     // ==========================================
+let steamName = "Steam User";
+let avatar = null;
 
-    let steamName = "Steam User";
-    let avatar = null;
+try {
+  const steamApiKey = process.env.STEAM_API_KEY;
 
-    try {
-      const steamResponse = await fetch(
-        `https://steamcommunity.com/profiles/${steamId}?xml=1`
-      );
+  const profileResponse = await fetch(
+    `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${steamApiKey}&steamids=${steamId}`
+  );
 
-      const xml = await steamResponse.text();
+  const profileData = await profileResponse.json();
 
-      const nameMatch =
-        xml.match(/<steamID><!\[CDATA\[(.*?)\]\]><\/steamID>/);
+  const profile =
+    profileData?.response?.players?.[0];
 
-      const avatarMatch =
-        xml.match(/<avatarFull><!\[CDATA\[(.*?)\]\]><\/avatarFull>/);
+  if (profile) {
+    steamName = profile.personaname || "Steam User";
+    avatar = profile.avatarfull || null;
+  }
 
-      if (nameMatch) {
-        steamName = nameMatch[1];
-      }
-
-      if (avatarMatch) {
-        avatar = avatarMatch[1];
-      }
-    } catch (profileError) {
-      console.error(
-        "STEAM PROFILE ERROR:",
-        profileError
-      );
-    }
+} catch (profileError) {
+  console.error(
+    "STEAM API ERROR:",
+    profileError
+  );
+}
 
     // ==========================================
     // Ищем пользователя
