@@ -343,6 +343,7 @@ function Home() {
 
           <div className="roulette-window">
 
+          
             <div
               className="roulette-track"
               ref={trackRef}
@@ -604,7 +605,166 @@ function Home() {
 // =========================
 // ROUTING
 // =========================
+function AdminPanel({ user }) {
+  const [steamId, setSteamId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
+  const giveBalance = async () => {
+    if (!steamId || !amount) {
+      setMessage("❌ Заполни все поля");
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/balance", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          targetSteamId: steamId,
+          amount: Number(amount),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(
+          `❌ ${data.error || "Ошибка"}`
+        );
+        return;
+      }
+
+      setMessage(
+        `✅ ${data.user.steam_name}: баланс теперь $${Number(
+          data.user.balance
+        ).toLocaleString()}`
+      );
+
+      setAmount("");
+    } catch (error) {
+      console.error(error);
+
+      setMessage(
+        "❌ Не удалось связаться с сервером"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="app">
+      <header>
+        <div className="logo">
+          ⛏ <span>Mine</span>Grade
+        </div>
+
+        <div className="header-right">
+          <div className="steam-user">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt="Steam avatar"
+                className="steam-avatar"
+              />
+            ) : (
+              <div className="steam-avatar-placeholder">
+                👤
+              </div>
+            )}
+
+            <div className="steam-user-info">
+              <strong>{user.steam_name}</strong>
+
+              <span>
+                🛡 ADMIN
+              </span>
+            </div>
+          </div>
+
+          <button
+            className="admin-button"
+            onClick={() => {
+              window.location.href = "/";
+            }}
+          >
+            ← BACK
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <div className="title">
+          <h1>ADMIN PANEL</h1>
+          <p>MineGrade administration</p>
+        </div>
+
+        <section className="admin-panel">
+          <div className="admin-card">
+            <span className="label">
+              TARGET STEAM ID
+            </span>
+
+            <input
+              className="admin-input"
+              type="text"
+              placeholder="7656119XXXXXXXXXX"
+              value={steamId}
+              onChange={(e) =>
+                setSteamId(e.target.value)
+              }
+            />
+          </div>
+
+          <div className="admin-card">
+            <span className="label">
+              BALANCE TO GIVE
+            </span>
+
+            <input
+              className="admin-input"
+              type="number"
+              placeholder="1000"
+              min="1"
+              value={amount}
+              onChange={(e) =>
+                setAmount(e.target.value)
+              }
+            />
+          </div>
+
+          <button
+            className="upgrade-button"
+            onClick={giveBalance}
+            disabled={loading}
+          >
+            {loading
+              ? "⚡ PROCESSING..."
+              : "💰 GIVE BALANCE"}
+          </button>
+
+          {message && (
+            <div className="admin-message">
+              {message}
+            </div>
+          )}
+        </section>
+      </main>
+
+      <footer>
+        MineGrade © 2026 · Administration
+      </footer>
+    </div>
+  );
+}
 function App() {
   if (
     window.location.pathname ===
